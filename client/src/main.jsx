@@ -124,7 +124,10 @@ function Login({ onLogin }) {
   return (
     <main className="login-shell">
       <section className="login-brand">
-        <img src={logo} alt="Minaret Academy" />
+        <img
+          src={logo}
+          alt="Minaret Academy"
+        />
 
         <p>Inspiring Excellence Everyday</p>
 
@@ -135,7 +138,10 @@ function Login({ onLogin }) {
         </div>
       </section>
 
-      <form className="login-card" onSubmit={submit}>
+      <form
+        className="login-card"
+        onSubmit={submit}
+      >
         <div className="lang-switch">
           <button
             type="button"
@@ -181,7 +187,9 @@ function Login({ onLogin }) {
 
           <input
             value={id}
-            onChange={(e) => setId(e.target.value)}
+            onChange={(e) =>
+              setId(e.target.value)
+            }
             required
           />
         </label>
@@ -192,7 +200,9 @@ function Login({ onLogin }) {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) =>
+              setPassword(e.target.value)
+            }
             required
           />
         </label>
@@ -271,7 +281,11 @@ function Portal({ user, onLogout }) {
           {nav.map(([id, label]) => (
             <button
               key={id}
-              className={section === id ? 'selected' : ''}
+              className={
+                section === id
+                  ? 'selected'
+                  : ''
+              }
               onClick={() => setSection(id)}
             >
               {label}
@@ -280,12 +294,16 @@ function Portal({ user, onLogout }) {
         </nav>
 
         <div className="side-bottom">
-          <button onClick={() => setAr(!ar)}>
+          <button
+            onClick={() => setAr(!ar)}
+          >
             {ar ? 'English' : 'العربية'}
           </button>
 
           <button
-            onClick={() => setSection('password')}
+            onClick={() =>
+              setSection('password')
+            }
           >
             Change password
           </button>
@@ -308,8 +326,9 @@ function Portal({ user, onLogout }) {
                 ? user.role === 'STUDENT'
                   ? 'السلام عليكم'
                   : 'Good day'
-                : nav.find((x) => x[0] === section)?.[1] ||
-                  'Account'}
+                : nav.find(
+                    (x) => x[0] === section
+                  )?.[1] || 'Account'}
             </h2>
           </div>
 
@@ -332,7 +351,9 @@ function Portal({ user, onLogout }) {
         )}
 
         {section === 'classes' && (
-          <Classes admin={user.role === 'ADMIN'} />
+          <Classes
+            admin={user.role === 'ADMIN'}
+          />
         )}
 
         {section === 'rosters' && (
@@ -361,8 +382,12 @@ function Dashboard({ user }) {
       try {
         setError('');
 
-        const classData = await api('/api/classes');
-        setClasses(classData.classes || []);
+        const classData =
+          await api('/api/classes');
+
+        setClasses(
+          classData.classes || []
+        );
 
         if (user.role === 'ADMIN') {
           const overviewData =
@@ -396,8 +421,9 @@ function Dashboard({ user }) {
           </h1>
 
           <p>
-            Quranic studies, Arabic language and Islamic
-            education—organized around each learner.
+            Quranic studies, Arabic language and
+            Islamic education—organized around
+            each learner.
           </p>
         </div>
 
@@ -456,7 +482,59 @@ const Stat = ({ n, l }) => (
    CLASS LIST
 ========================================================= */
 
-function ClassList({ classes }) {
+function ClassList({
+  classes,
+  admin = false,
+  onStatusChange,
+}) {
+  const [busyId, setBusyId] =
+    useState(null);
+
+  const [error, setError] =
+    useState('');
+
+  const changeStatus = async (
+    id,
+    status
+  ) => {
+    if (status === 'cancelled') {
+      const confirmed =
+        window.confirm(
+          'Are you sure you want to cancel this class?'
+        );
+
+      if (!confirmed) return;
+    }
+
+    try {
+      setBusyId(id);
+      setError('');
+
+      await api(
+        `/api/classes/${id}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status,
+          }),
+        }
+      );
+
+      if (onStatusChange) {
+        await onStatusChange();
+      }
+    } catch (e) {
+      console.error(
+        'Failed to update class:',
+        e
+      );
+
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (!classes.length) {
     return (
       <div className="empty">
@@ -466,69 +544,177 @@ function ClassList({ classes }) {
   }
 
   return (
-    <div className="class-list">
-      {classes.map((c) => {
-        const date = new Date(c.scheduled_at);
+    <>
+      {error && (
+        <div className="alert">
+          {error}
+        </div>
+      )}
 
-        return (
-          <article
-            className="class-card"
-            key={c.id}
-          >
-            <div className="date-block">
-              <b>
-                {date.toLocaleDateString(undefined, {
-                  day: '2-digit',
-                })}
-              </b>
+      <div className="class-list">
+        {classes.map((c) => {
+          const date = new Date(
+            c.scheduled_at
+          );
 
-              <span>
-                {date.toLocaleDateString(undefined, {
-                  month: 'short',
-                })}
-              </span>
-            </div>
+          const status =
+            c.status || 'scheduled';
 
-            <div className="class-main">
-              <span className="eyebrow">
-                {c.course_name || 'Academy class'}
-              </span>
+          const isBusy =
+            busyId === c.id;
 
-              <h4>{c.title}</h4>
+          return (
+            <article
+              className={`class-card class-status-${status}`}
+              key={c.id}
+            >
+              <div className="date-block">
+                <b>
+                  {date.toLocaleDateString(
+                    undefined,
+                    {
+                      day: '2-digit',
+                    }
+                  )}
+                </b>
 
-              <p>
-                {c.teacher_name} ·{' '}
-                {date.toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}{' '}
-                · {c.duration_minutes} min
-              </p>
+                <span>
+                  {date.toLocaleDateString(
+                    undefined,
+                    {
+                      month: 'short',
+                    }
+                  )}
+                </span>
+              </div>
 
-              {c.students?.length > 0 && (
-                <small>
-                  Student:{' '}
-                  {c.students
-                    .map((s) => s.name)
-                    .join(', ')}
-                </small>
-              )}
-            </div>
+              <div className="class-main">
+                <span className="eyebrow">
+                  {c.course_name ||
+                    'Academy class'}
+                </span>
 
-            {c.meet_link && (
-              <a
-                className="join"
-                href={c.meet_link}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Join class ↗
-              </a>
-            )}
-          </article>
-        );
-      })}
-    </div>
+                <h4>{c.title}</h4>
+
+                <p>
+                  {c.teacher_name} ·{' '}
+                  {date.toLocaleTimeString(
+                    [],
+                    {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    }
+                  )}{' '}
+                  · {c.duration_minutes} min
+                </p>
+
+                {c.students?.length > 0 && (
+                  <small>
+                    Student:{' '}
+                    {c.students
+                      .map(
+                        (student) =>
+                          student.name
+                      )
+                      .join(', ')}
+                  </small>
+                )}
+
+                <div className="class-meta">
+                  <span
+                    className={`class-status ${status}`}
+                  >
+                    {status ===
+                      'scheduled' &&
+                      'Scheduled'}
+
+                    {status ===
+                      'completed' &&
+                      'Completed'}
+
+                    {status ===
+                      'cancelled' &&
+                      'Cancelled'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="class-actions">
+                {status === 'scheduled' &&
+                  c.meet_link && (
+                    <a
+                      className="join"
+                      href={c.meet_link}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Join class ↗
+                    </a>
+                  )}
+
+                {admin && (
+                  <div className="admin-class-actions">
+                    {status ===
+                      'scheduled' && (
+                      <>
+                        <button
+                          type="button"
+                          className="class-action-btn"
+                          disabled={isBusy}
+                          onClick={() =>
+                            changeStatus(
+                              c.id,
+                              'completed'
+                            )
+                          }
+                        >
+                          {isBusy
+                            ? 'Updating…'
+                            : 'Mark completed'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="class-action-btn danger"
+                          disabled={isBusy}
+                          onClick={() =>
+                            changeStatus(
+                              c.id,
+                              'cancelled'
+                            )
+                          }
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+
+                    {status ===
+                      'cancelled' && (
+                      <button
+                        type="button"
+                        className="class-action-btn"
+                        disabled={isBusy}
+                        onClick={() =>
+                          changeStatus(
+                            c.id,
+                            'scheduled'
+                          )
+                        }
+                      >
+                        {isBusy
+                          ? 'Updating…'
+                          : 'Restore'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -538,9 +724,14 @@ function ClassList({ classes }) {
 
 function Students({ user }) {
   const [items, setItems] = useState([]);
-  const [show, setShow] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [show, setShow] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
 
   const load = async () => {
     try {
@@ -658,16 +849,22 @@ function Students({ user }) {
 
 function Teachers() {
   const [items, setItems] = useState([]);
-  const [show, setShow] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [show, setShow] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
 
   const load = async () => {
     try {
       setLoading(true);
       setError('');
 
-      const data = await api('/api/teachers');
+      const data =
+        await api('/api/teachers');
 
       setItems(data.teachers || []);
     } catch (e) {
@@ -723,18 +920,21 @@ function Teachers() {
               key={teacher.id}
             >
               <div className="avatar">
-                {teacher.name?.[0] || 'T'}
+                {teacher.name?.[0] ||
+                  'T'}
               </div>
 
               <div>
                 <h4>{teacher.name}</h4>
 
                 <p>
-                  {teacher.phone || 'No phone'}
+                  {teacher.phone ||
+                    'No phone'}
                 </p>
 
                 <small>
-                  {teacher.email || 'No email'}
+                  {teacher.email ||
+                    'No email'}
                 </small>
 
                 <small>
@@ -766,16 +966,20 @@ function UserModal({
   onClose,
   onDone,
 }) {
-  const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    password: '',
-    timezone: 'Africa/Lagos',
-  });
+  const [form, setForm] =
+    useState({
+      name: '',
+      phone: '',
+      email: '',
+      password: '',
+      timezone: 'Africa/Lagos',
+    });
 
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [error, setError] =
+    useState('');
+
+  const [busy, setBusy] =
+    useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -876,7 +1080,8 @@ function UserModal({
             onChange={(e) =>
               setForm({
                 ...form,
-                password: e.target.value,
+                password:
+                  e.target.value,
               })
             }
           />
@@ -890,7 +1095,8 @@ function UserModal({
             onChange={(e) =>
               setForm({
                 ...form,
-                timezone: e.target.value,
+                timezone:
+                  e.target.value,
               })
             }
           />
@@ -914,13 +1120,26 @@ function UserModal({
 ========================================================= */
 
 function Rosters() {
-  const [teachers, setTeachers] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [teacher, setTeacher] = useState('');
-  const [assigned, setAssigned] = useState([]);
-  const [student, setStudent] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [teachers, setTeachers] =
+    useState([]);
+
+  const [students, setStudents] =
+    useState([]);
+
+  const [teacher, setTeacher] =
+    useState('');
+
+  const [assigned, setAssigned] =
+    useState([]);
+
+  const [student, setStudent] =
+    useState('');
+
+  const [error, setError] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
     async function loadData() {
@@ -928,11 +1147,13 @@ function Rosters() {
         setLoading(true);
         setError('');
 
-        const [teacherData, studentData] =
-          await Promise.all([
-            api('/api/teachers'),
-            api('/api/students'),
-          ]);
+        const [
+          teacherData,
+          studentData,
+        ] = await Promise.all([
+          api('/api/teachers'),
+          api('/api/students'),
+        ]);
 
         setTeachers(
           teacherData.teachers || []
@@ -970,7 +1191,9 @@ function Rosters() {
           `/api/rosters/${teacher}`
         );
 
-        setAssigned(data.students || []);
+        setAssigned(
+          data.students || []
+        );
       } catch (e) {
         console.error(e);
         setError(e.message);
@@ -1004,13 +1227,17 @@ function Rosters() {
         `/api/rosters/${teacher}`
       );
 
-      setAssigned(data.students || []);
+      setAssigned(
+        data.students || []
+      );
     } catch (e) {
       setError(e.message);
     }
   };
 
-  const remove = async (studentId) => {
+  const remove = async (
+    studentId
+  ) => {
     try {
       setError('');
 
@@ -1023,7 +1250,8 @@ function Rosters() {
 
       setAssigned((current) =>
         current.filter(
-          (item) => item.id !== studentId
+          (item) =>
+            item.id !== studentId
         )
       );
     } catch (e) {
@@ -1072,7 +1300,9 @@ function Rosters() {
           <select
             value={student}
             onChange={(e) =>
-              setStudent(e.target.value)
+              setStudent(
+                e.target.value
+              )
             }
           >
             <option value="">
@@ -1083,7 +1313,8 @@ function Rosters() {
               .filter(
                 (s) =>
                   !assigned.some(
-                    (a) => a.id === s.id
+                    (a) =>
+                      a.id === s.id
                   )
               )
               .map((s) => (
@@ -1099,7 +1330,9 @@ function Rosters() {
           <button
             className="primary small"
             onClick={add}
-            disabled={!teacher || !student}
+            disabled={
+              !teacher || !student
+            }
           >
             Assign
           </button>
@@ -1109,13 +1342,16 @@ function Rosters() {
       <div className="table-card">
         {assigned.length === 0 ? (
           <div className="empty">
-            No students assigned to this teacher.
+            No students assigned to
+            this teacher.
           </div>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Assigned students</th>
+                <th>
+                  Assigned students
+                </th>
                 <th>Phone</th>
                 <th></th>
               </tr>
@@ -1155,19 +1391,29 @@ function Rosters() {
 ========================================================= */
 
 function Classes({ admin = false }) {
-  const [classes, setClasses] = useState([]);
-  const [show, setShow] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [classes, setClasses] =
+    useState([]);
+
+  const [show, setShow] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
 
   const load = async () => {
     try {
       setLoading(true);
       setError('');
 
-      const data = await api('/api/classes');
+      const data =
+        await api('/api/classes');
 
-      setClasses(data.classes || []);
+      setClasses(
+        data.classes || []
+      );
     } catch (e) {
       console.error(
         'Failed to load classes:',
@@ -1194,7 +1440,9 @@ function Classes({ admin = false }) {
         {admin && (
           <button
             className="primary small"
-            onClick={() => setShow(true)}
+            onClick={() =>
+              setShow(true)
+            }
           >
             + Schedule class
           </button>
@@ -1212,12 +1460,18 @@ function Classes({ admin = false }) {
           Loading classes…
         </div>
       ) : (
-        <ClassList classes={classes} />
+        <ClassList
+          classes={classes}
+          admin={admin}
+          onStatusChange={load}
+        />
       )}
 
       {show && (
         <ScheduleModal
-          onClose={() => setShow(false)}
+          onClose={() =>
+            setShow(false)
+          }
           onDone={load}
         />
       )}
@@ -1233,34 +1487,45 @@ function ScheduleModal({
   onClose,
   onDone,
 }) {
-  const [teachers, setTeachers] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [courses, setCourses] = useState([]);
+  const [teachers, setTeachers] =
+    useState([]);
 
-  const [form, setForm] = useState({
-    teacherId: '',
-    studentIds: [],
-    courseId: '',
-    title: 'Quran & Tajweed',
-    scheduledAt: '',
-    durationMinutes: 60,
-    meetLink: '',
-    notes: '',
-  });
+  const [students, setStudents] =
+    useState([]);
 
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [courses, setCourses] =
+    useState([]);
+
+  const [form, setForm] =
+    useState({
+      teacherId: '',
+      studentIds: [],
+      courseId: '',
+      title: 'Quran & Tajweed',
+      scheduledAt: '',
+      durationMinutes: 60,
+      meetLink: '',
+      notes: '',
+    });
+
+  const [error, setError] =
+    useState('');
+
+  const [busy, setBusy] =
+    useState(false);
 
   useEffect(() => {
     async function loadOptions() {
       try {
         setError('');
 
-        const [teacherData, courseData] =
-          await Promise.all([
-            api('/api/teachers'),
-            api('/api/courses'),
-          ]);
+        const [
+          teacherData,
+          courseData,
+        ] = await Promise.all([
+          api('/api/teachers'),
+          api('/api/courses'),
+        ]);
 
         const teacherList =
           teacherData.teachers || [];
@@ -1274,7 +1539,8 @@ function ScheduleModal({
         if (teacherList[0]) {
           setForm((current) => ({
             ...current,
-            teacherId: teacherList[0].id,
+            teacherId:
+              teacherList[0].id,
           }));
         }
       } catch (e) {
@@ -1298,7 +1564,9 @@ function ScheduleModal({
           `/api/teachers/${form.teacherId}/assigned-students`
         );
 
-        setStudents(data.students || []);
+        setStudents(
+          data.students || []
+        );
 
         setForm((current) => ({
           ...current,
@@ -1319,7 +1587,9 @@ function ScheduleModal({
     setError('');
 
     if (!form.teacherId) {
-      setError('Please select a teacher.');
+      setError(
+        'Please select a teacher.'
+      );
       return;
     }
 
@@ -1389,7 +1659,8 @@ function ScheduleModal({
             onChange={(e) =>
               setForm({
                 ...form,
-                teacherId: e.target.value,
+                teacherId:
+                  e.target.value,
                 studentIds: [],
               })
             }
@@ -1413,13 +1684,16 @@ function ScheduleModal({
           Assigned student
 
           <select
-            value={form.studentIds[0] || ''}
+            value={
+              form.studentIds[0] || ''
+            }
             onChange={(e) =>
               setForm({
                 ...form,
-                studentIds: e.target.value
-                  ? [e.target.value]
-                  : [],
+                studentIds:
+                  e.target.value
+                    ? [e.target.value]
+                    : [],
               })
             }
           >
@@ -1446,7 +1720,8 @@ function ScheduleModal({
             onChange={(e) =>
               setForm({
                 ...form,
-                courseId: e.target.value,
+                courseId:
+                  e.target.value,
               })
             }
           >
@@ -1490,9 +1765,10 @@ function ScheduleModal({
               onChange={(e) =>
                 setForm({
                   ...form,
-                  scheduledAt: new Date(
-                    e.target.value
-                  ).toISOString(),
+                  scheduledAt:
+                    new Date(
+                      e.target.value
+                    ).toISOString(),
                 })
               }
             />
@@ -1502,7 +1778,9 @@ function ScheduleModal({
             Duration
 
             <select
-              value={form.durationMinutes}
+              value={
+                form.durationMinutes
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1537,7 +1815,8 @@ function ScheduleModal({
             onChange={(e) =>
               setForm({
                 ...form,
-                meetLink: e.target.value,
+                meetLink:
+                  e.target.value,
               })
             }
           />
@@ -1649,7 +1928,9 @@ function Password() {
             required
             value={currentPassword}
             onChange={(e) =>
-              setCurrent(e.target.value)
+              setCurrent(
+                e.target.value
+              )
             }
           />
         </label>
@@ -1663,7 +1944,9 @@ function Password() {
             required
             value={newPassword}
             onChange={(e) =>
-              setNew(e.target.value)
+              setNew(
+                e.target.value
+              )
             }
           />
         </label>

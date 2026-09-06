@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&family=Noto+Naskh+Arabic:wght@500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&family=Noto+Naskh+Arabic:wght@500;600&display=swap");
 
 :root {
   --brown: #5a2412;
@@ -859,4 +859,94 @@ tr:last-child td {
   .content {
     padding: 20px 12px;
   }
+}
+/* =========================
+   CLASS STATUS / ACTIONS
+========================= */
+
+.class-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.class-meta {
+  margin-top: 8px;
+}
+
+.class-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.class-status.scheduled {
+  background: #e6efe8;
+  color: var(--green);
+}
+
+.class-status.completed {
+  background: #e8edf3;
+  color: #536273;
+}
+
+.class-status.cancelled {
+  background: #f4e5e1;
+  color: #9b493d;
+}
+
+.admin-class-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.class-action-btn {
+  border: 1px solid #d6c4ac;
+  background: #fffaf3;
+  color: var(--brown);
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.class-action-btn:hover {
+  background: #f5eadb;
+}
+
+.class-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.class-action-btn.danger {
+  border-color: #dfb7af;
+  color: #9b493d;
+  background: #fff7f5;
+}
+
+.class-action-btn.danger:hover {
+  background: #f9e8e4;
+}
+
+.class-status-cancelled {
+  opacity: 0.8;
+}
+
+.class-status-cancelled .class-main h4 {
+  text-decoration: line-through;
+}
+
+.class-status-completed {
+  opacity: 0.9;
 }
