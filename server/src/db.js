@@ -1,24 +1,19 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+
+dotenv.config();
 
 const { Pool } = pg;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// The .env file is in the project root, one level above server/
-const envPath = path.resolve(__dirname, '../../.env');
-
-dotenv.config({ path: envPath });
-
 if (!process.env.DATABASE_URL) {
-  throw new Error(`DATABASE_URL was not loaded from ${envPath}`);
+  throw new Error('DATABASE_URL is required');
 }
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 export async function query(text, params) {
