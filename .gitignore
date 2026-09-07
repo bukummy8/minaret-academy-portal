@@ -6,3 +6,5 @@ dist/
 coverage/
 *.log
 .DS_Store
+.neon
+minaret_academy_backup.sql
