@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import logo from './assets/minaret-logo.png';
 
+/* =========================================================
+   API
+========================================================= */
+
 const api = async (path, options = {}) => {
   const response = await fetch(path, {
     credentials: 'include',
@@ -187,9 +191,7 @@ function Login({ onLogin }) {
 
           <input
             value={id}
-            onChange={(e) =>
-              setId(e.target.value)
-            }
+            onChange={(e) => setId(e.target.value)}
             required
           />
         </label>
@@ -200,9 +202,7 @@ function Login({ onLogin }) {
           <input
             type="password"
             value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
         </label>
@@ -459,6 +459,20 @@ function Dashboard({ user }) {
             n={overview.upcoming}
             l="Upcoming classes"
           />
+
+          {overview.inactiveStudents !== undefined && (
+            <Stat
+              n={overview.inactiveStudents}
+              l="Inactive students"
+            />
+          )}
+
+          {overview.inactiveTeachers !== undefined && (
+            <Stat
+              n={overview.inactiveTeachers}
+              l="Inactive teachers"
+            />
+          )}
         </div>
       )}
 
@@ -486,6 +500,7 @@ function ClassList({
   classes,
   admin = false,
   onStatusChange,
+  onEdit,
 }) {
   const [busyId, setBusyId] =
     useState(null);
@@ -538,7 +553,7 @@ function ClassList({
   if (!classes.length) {
     return (
       <div className="empty">
-        No upcoming classes scheduled.
+        No classes found.
       </div>
     );
   }
@@ -620,6 +635,12 @@ function ClassList({
                   </small>
                 )}
 
+                {c.notes && (
+                  <small className="class-notes">
+                    {c.notes}
+                  </small>
+                )}
+
                 <div className="class-meta">
                   <span
                     className={`class-status ${status}`}
@@ -654,9 +675,21 @@ function ClassList({
 
                 {admin && (
                   <div className="admin-class-actions">
-                    {status ===
-                      'scheduled' && (
+                    {status === 'scheduled' && (
                       <>
+                        <button
+                          type="button"
+                          className="class-action-btn"
+                          disabled={isBusy}
+                          onClick={() =>
+                            onEdit
+                              ? onEdit(c)
+                              : null
+                          }
+                        >
+                          Edit / Reschedule
+                        </button>
+
                         <button
                           type="button"
                           className="class-action-btn"
@@ -689,23 +722,37 @@ function ClassList({
                       </>
                     )}
 
-                    {status ===
-                      'cancelled' && (
-                      <button
-                        type="button"
-                        className="class-action-btn"
-                        disabled={isBusy}
-                        onClick={() =>
-                          changeStatus(
-                            c.id,
-                            'scheduled'
-                          )
-                        }
-                      >
-                        {isBusy
-                          ? 'Updating…'
-                          : 'Restore'}
-                      </button>
+                    {status === 'cancelled' && (
+                      <>
+                        <button
+                          type="button"
+                          className="class-action-btn"
+                          disabled={isBusy}
+                          onClick={() =>
+                            onEdit
+                              ? onEdit(c)
+                              : null
+                          }
+                        >
+                          Edit / Reschedule
+                        </button>
+
+                        <button
+                          type="button"
+                          className="class-action-btn"
+                          disabled={isBusy}
+                          onClick={() =>
+                            changeStatus(
+                              c.id,
+                              'scheduled'
+                            )
+                          }
+                        >
+                          {isBusy
+                            ? 'Updating…'
+                            : 'Restore'}
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -762,6 +809,37 @@ function Students({ user }) {
     load();
   }, [user]);
 
+  const toggleStudent = async (student) => {
+    const action = student.active
+      ? 'deactivate'
+      : 'reactivate';
+
+    const confirmed =
+      window.confirm(
+        `Are you sure you want to ${action} ${student.name}?`
+      );
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+
+      await api(
+        `/api/students/${student.id}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            active: !student.active,
+          }),
+        }
+      );
+
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   return (
     <>
       <div className="toolbar">
@@ -802,6 +880,9 @@ function Students({ user }) {
                 <th>Phone</th>
                 <th>Time zone</th>
                 <th>Status</th>
+                {user.role === 'ADMIN' && (
+                  <th>Actions</th>
+                )}
               </tr>
             </thead>
 
@@ -819,12 +900,37 @@ function Students({ user }) {
                   </td>
 
                   <td>
-                    <span className="status">
+                    <span
+                      className={
+                        student.active
+                          ? 'status'
+                          : 'status inactive'
+                      }
+                    >
                       {student.active
                         ? 'Active'
                         : 'Inactive'}
                     </span>
                   </td>
+
+                  {user.role === 'ADMIN' && (
+                    <td>
+                      <button
+                        className={
+                          student.active
+                            ? 'text-btn danger-text'
+                            : 'text-btn'
+                        }
+                        onClick={() =>
+                          toggleStudent(student)
+                        }
+                      >
+                        {student.active
+                          ? 'Deactivate'
+                          : 'Reactivate'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -883,6 +989,37 @@ function Teachers() {
     load();
   }, []);
 
+  const toggleTeacher = async (teacher) => {
+    const action = teacher.active
+      ? 'deactivate'
+      : 'reactivate';
+
+    const confirmed =
+      window.confirm(
+        `Are you sure you want to ${action} ${teacher.name}?`
+      );
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+
+      await api(
+        `/api/teachers/${teacher.id}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            active: !teacher.active,
+          }),
+        }
+      );
+
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   return (
     <>
       <div className="toolbar">
@@ -916,7 +1053,11 @@ function Teachers() {
         <div className="people-grid">
           {items.map((teacher) => (
             <div
-              className="person-card"
+              className={`person-card ${
+                teacher.active
+                  ? ''
+                  : 'person-inactive'
+              }`}
               key={teacher.id}
             >
               <div className="avatar">
@@ -924,7 +1065,7 @@ function Teachers() {
                   'T'}
               </div>
 
-              <div>
+              <div className="person-info">
                 <h4>{teacher.name}</h4>
 
                 <p>
@@ -940,6 +1081,35 @@ function Teachers() {
                 <small>
                   {teacher.timezone}
                 </small>
+
+                <span
+                  className={
+                    teacher.active
+                      ? 'status'
+                      : 'status inactive'
+                  }
+                >
+                  {teacher.active
+                    ? 'Active'
+                    : 'Inactive'}
+                </span>
+
+                <div className="person-actions">
+                  <button
+                    className={
+                      teacher.active
+                        ? 'text-btn danger-text'
+                        : 'text-btn'
+                    }
+                    onClick={() =>
+                      toggleTeacher(teacher)
+                    }
+                  >
+                    {teacher.active
+                      ? 'Deactivate'
+                      : 'Reactivate'}
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -1238,6 +1408,18 @@ function Rosters() {
   const remove = async (
     studentId
   ) => {
+    const studentName =
+      assigned.find(
+        (item) => item.id === studentId
+      )?.name || 'this student';
+
+    const confirmed =
+      window.confirm(
+        `Remove ${studentName} from this teacher's roster?`
+      );
+
+    if (!confirmed) return;
+
     try {
       setError('');
 
@@ -1275,7 +1457,7 @@ function Rosters() {
         </div>
       )}
 
-      <div className="toolbar">
+      <div className="toolbar roster-toolbar">
         <select
           value={teacher}
           onChange={(e) =>
@@ -1286,14 +1468,16 @@ function Rosters() {
             Select teacher…
           </option>
 
-          {teachers.map((item) => (
-            <option
-              value={item.id}
-              key={item.id}
-            >
-              {item.name}
-            </option>
-          ))}
+          {teachers
+            .filter((item) => item.active)
+            .map((item) => (
+              <option
+                value={item.id}
+                key={item.id}
+              >
+                {item.name}
+              </option>
+            ))}
         </select>
 
         <div className="inline">
@@ -1312,6 +1496,7 @@ function Rosters() {
             {students
               .filter(
                 (s) =>
+                  s.active &&
                   !assigned.some(
                     (a) =>
                       a.id === s.id
@@ -1353,6 +1538,7 @@ function Rosters() {
                   Assigned students
                 </th>
                 <th>Phone</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
@@ -1367,8 +1553,22 @@ function Rosters() {
                   </td>
 
                   <td>
+                    <span
+                      className={
+                        s.active
+                          ? 'status'
+                          : 'status inactive'
+                      }
+                    >
+                      {s.active
+                        ? 'Active'
+                        : 'Inactive'}
+                    </span>
+                  </td>
+
+                  <td>
                     <button
-                      className="text-btn"
+                      className="text-btn danger-text"
                       onClick={() =>
                         remove(s.id)
                       }
@@ -1396,6 +1596,9 @@ function Classes({ admin = false }) {
 
   const [show, setShow] =
     useState(false);
+
+  const [editingClass, setEditingClass] =
+    useState(null);
 
   const [error, setError] =
     useState('');
@@ -1429,6 +1632,10 @@ function Classes({ admin = false }) {
   useEffect(() => {
     load();
   }, []);
+
+  const openEdit = (item) => {
+    setEditingClass(item);
+  };
 
   return (
     <>
@@ -1464,6 +1671,7 @@ function Classes({ admin = false }) {
           classes={classes}
           admin={admin}
           onStatusChange={load}
+          onEdit={openEdit}
         />
       )}
 
@@ -1471,6 +1679,16 @@ function Classes({ admin = false }) {
         <ScheduleModal
           onClose={() =>
             setShow(false)
+          }
+          onDone={load}
+        />
+      )}
+
+      {editingClass && (
+        <EditClassModal
+          classData={editingClass}
+          onClose={() =>
+            setEditingClass(null)
           }
           onDone={load}
         />
@@ -1528,7 +1746,10 @@ function ScheduleModal({
         ]);
 
         const teacherList =
-          teacherData.teachers || [];
+          (teacherData.teachers || [])
+            .filter((teacher) =>
+              teacher.active
+            );
 
         const courseList =
           courseData.courses || [];
@@ -1850,6 +2071,415 @@ function ScheduleModal({
 }
 
 /* =========================================================
+   EDIT / RESCHEDULE CLASS MODAL
+========================================================= */
+
+function EditClassModal({
+  classData,
+  onClose,
+  onDone,
+}) {
+  const [teachers, setTeachers] =
+    useState([]);
+
+  const [students, setStudents] =
+    useState([]);
+
+  const [courses, setCourses] =
+    useState([]);
+
+  const initialDate = classData.scheduled_at
+    ? new Date(classData.scheduled_at)
+    : new Date();
+
+  const toLocalInput = (date) => {
+    const pad = (n) =>
+      String(n).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(
+      date.getMonth() + 1
+    )}-${pad(date.getDate())}T${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}`;
+  };
+
+  const existingStudentIds =
+    Array.isArray(classData.students)
+      ? classData.students.map(
+          (s) => s.id
+        )
+      : [];
+
+  const [form, setForm] =
+    useState({
+      teacherId:
+        classData.teacher_id || '',
+      studentIds:
+        existingStudentIds,
+      courseId:
+        classData.course_id || '',
+      title:
+        classData.title || '',
+      scheduledAt:
+        toLocalInput(initialDate),
+      durationMinutes:
+        classData.duration_minutes || 60,
+      meetLink:
+        classData.meet_link || '',
+      notes:
+        classData.notes || '',
+    });
+
+  const [error, setError] =
+    useState('');
+
+  const [busy, setBusy] =
+    useState(false);
+
+  useEffect(() => {
+    async function loadOptions() {
+      try {
+        const [
+          teacherData,
+          courseData,
+        ] = await Promise.all([
+          api('/api/teachers'),
+          api('/api/courses'),
+        ]);
+
+        setTeachers(
+          (teacherData.teachers || [])
+            .filter((teacher) =>
+              teacher.active
+            )
+        );
+
+        setCourses(
+          courseData.courses || []
+        );
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    loadOptions();
+  }, []);
+
+  useEffect(() => {
+    async function loadAssignedStudents() {
+      if (!form.teacherId) {
+        setStudents([]);
+        return;
+      }
+
+      try {
+        const data = await api(
+          `/api/teachers/${form.teacherId}/assigned-students`
+        );
+
+        setStudents(
+          data.students || []
+        );
+
+        setForm((current) => ({
+          ...current,
+          studentIds:
+            current.studentIds.filter(
+              (id) =>
+                (data.students || []).some(
+                  (student) =>
+                    student.id === id
+                )
+            ),
+        }));
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    loadAssignedStudents();
+  }, [form.teacherId]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+
+    setError('');
+
+    if (!form.teacherId) {
+      setError('Please select a teacher.');
+      return;
+    }
+
+    if (!form.studentIds.length) {
+      setError(
+        'Please select an assigned student.'
+      );
+      return;
+    }
+
+    if (!form.scheduledAt) {
+      setError(
+        'Please select a date and time.'
+      );
+      return;
+    }
+
+    if (!form.meetLink) {
+      setError(
+        'Please enter the Google Meet link.'
+      );
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      await api(
+        `/api/classes/${classData.id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            teacherId: form.teacherId,
+            studentIds: form.studentIds,
+            courseId:
+              form.courseId || undefined,
+            title: form.title,
+            scheduledAt:
+              new Date(
+                form.scheduledAt
+              ).toISOString(),
+            durationMinutes: Number(
+              form.durationMinutes
+            ),
+            meetLink: form.meetLink,
+            notes: form.notes,
+          }),
+        }
+      );
+
+      await onDone();
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Edit / Reschedule class"
+      onClose={onClose}
+    >
+      <form
+        className="modal-form"
+        onSubmit={submit}
+      >
+        {error && (
+          <div className="alert">
+            {error}
+          </div>
+        )}
+
+        <label>
+          Teacher
+
+          <select
+            value={form.teacherId}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                teacherId:
+                  e.target.value,
+                studentIds: [],
+              })
+            }
+          >
+            <option value="">
+              Select teacher…
+            </option>
+
+            {teachers.map((teacher) => (
+              <option
+                key={teacher.id}
+                value={teacher.id}
+              >
+                {teacher.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Assigned student
+
+          <select
+            value={
+              form.studentIds[0] || ''
+            }
+            onChange={(e) =>
+              setForm({
+                ...form,
+                studentIds:
+                  e.target.value
+                    ? [e.target.value]
+                    : [],
+              })
+            }
+          >
+            <option value="">
+              Select student…
+            </option>
+
+            {students.map((student) => (
+              <option
+                key={student.id}
+                value={student.id}
+              >
+                {student.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Course
+
+          <select
+            value={form.courseId}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                courseId:
+                  e.target.value,
+              })
+            }
+          >
+            <option value="">
+              Select course…
+            </option>
+
+            {courses.map((course) => (
+              <option
+                key={course.id}
+                value={course.id}
+              >
+                {course.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Title
+
+          <input
+            required
+            value={form.title}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                title: e.target.value,
+              })
+            }
+          />
+        </label>
+
+        <div className="two">
+          <label>
+            Date & time
+
+            <input
+              required
+              type="datetime-local"
+              value={
+                form.scheduledAt
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  scheduledAt:
+                    e.target.value,
+                })
+              }
+            />
+          </label>
+
+          <label>
+            Duration
+
+            <select
+              value={
+                form.durationMinutes
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  durationMinutes:
+                    e.target.value,
+                })
+              }
+            >
+              <option value="60">
+                60 minutes
+              </option>
+
+              <option value="45">
+                45 minutes
+              </option>
+
+              <option value="90">
+                90 minutes
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Google Meet link
+
+          <input
+            required
+            type="url"
+            value={form.meetLink}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                meetLink:
+                  e.target.value,
+              })
+            }
+          />
+        </label>
+
+        <label>
+          Notes
+
+          <textarea
+            value={form.notes}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                notes: e.target.value,
+              })
+            }
+          />
+        </label>
+
+        <button
+          className="primary"
+          disabled={busy}
+        >
+          {busy
+            ? 'Saving…'
+            : 'Save changes'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+/* =========================================================
    PASSWORD
 ========================================================= */
 
@@ -1858,6 +2488,9 @@ function Password() {
     useState('');
 
   const [newPassword, setNew] =
+    useState('');
+
+  const [confirmPassword, setConfirm] =
     useState('');
 
   const [msg, setMsg] =
@@ -1870,6 +2503,14 @@ function Password() {
     e.preventDefault();
 
     setMsg('');
+
+    if (newPassword !== confirmPassword) {
+      setMsg(
+        'New passwords do not match.'
+      );
+      return;
+    }
+
     setBusy(true);
 
     try {
@@ -1890,6 +2531,7 @@ function Password() {
 
       setCurrent('');
       setNew('');
+      setConfirm('');
     } catch (e) {
       setMsg(e.message);
     } finally {
@@ -1945,6 +2587,22 @@ function Password() {
             value={newPassword}
             onChange={(e) =>
               setNew(
+                e.target.value
+              )
+            }
+          />
+        </label>
+
+        <label>
+          Confirm new password
+
+          <input
+            type="password"
+            minLength="8"
+            required
+            value={confirmPassword}
+            onChange={(e) =>
+              setConfirm(
                 e.target.value
               )
             }
