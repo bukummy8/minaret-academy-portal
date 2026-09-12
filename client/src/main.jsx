@@ -724,17 +724,10 @@ function ClassList({
 
 function Students({ user }) {
   const [items, setItems] = useState([]);
-  const [show, setShow] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [deletingId, setDeletingId] =
-    useState('');
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
 
   const load = async () => {
     try {
@@ -747,30 +740,54 @@ function Students({ user }) {
           : `/api/rosters/${user.id}`;
 
       const data = await api(path);
-
       setItems(data.students || []);
     } catch (e) {
-      console.error(
-        'Failed to load students:',
-        e
-      );
-
+      console.error('Failed to load students:', e);
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteStudent = async (student) => {
+  const toggleStudent = async (student) => {
+    const action = student.active ? 'deactivate' : 'reactivate';
+
     const confirmed = window.confirm(
-      `Delete student \"${student.name}\" permanently? This will remove the student from teacher rosters and scheduled classes.`
+      `Are you sure you want to ${action} ${student.name}?`
     );
 
     if (!confirmed) return;
 
     try {
       setError('');
-      setDeletingId(student.id);
+      setBusyId(student.id);
+
+      await api(`/api/students/${student.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          active: !student.active,
+        }),
+      });
+
+      await load();
+    } catch (e) {
+      console.error('Failed to update student status:', e);
+      setError(e.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const deleteStudent = async (student) => {
+    const confirmed = window.confirm(
+      `Delete student "${student.name}" permanently? This will remove the student from teacher rosters and scheduled classes.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setBusyId(student.id);
 
       await api(`/api/students/${student.id}`, {
         method: 'DELETE',
@@ -783,7 +800,7 @@ function Students({ user }) {
       console.error('Failed to delete student:', e);
       setError(e.message);
     } finally {
-      setDeletingId('');
+      setBusyId('');
     }
   };
 
@@ -836,42 +853,69 @@ function Students({ user }) {
             </thead>
 
             <tbody>
-              {items.map((student) => (
-                <tr key={student.id}>
-                  <td>{student.name}</td>
+              {items.map((student) => {
+                const isBusy = busyId === student.id;
 
-                  <td>
-                    {student.phone || '—'}
-                  </td>
+                return (
+                  <tr key={student.id}>
+                    <td>{student.name}</td>
 
-                  <td>
-                    {student.timezone || '—'}
-                  </td>
-
-                  <td>
-                    <span className="status">
-                      {student.active
-                        ? 'Active'
-                        : 'Inactive'}
-                    </span>
-                  </td>
-
-                  {user.role === 'ADMIN' && (
                     <td>
-                      <button
-                        type="button"
-                        className="text-btn"
-                        disabled={deletingId === student.id}
-                        onClick={() => deleteStudent(student)}
-                      >
-                        {deletingId === student.id
-                          ? 'Deleting…'
-                          : 'Delete'}
-                      </button>
+                      {student.phone || '—'}
                     </td>
-                  )}
-                </tr>
-              ))}
+
+                    <td>
+                      {student.timezone || '—'}
+                    </td>
+
+                    <td>
+                      <span
+                        className={
+                          student.active
+                            ? 'status'
+                            : 'status inactive'
+                        }
+                      >
+                        {student.active
+                          ? 'Active'
+                          : 'Inactive'}
+                      </span>
+                    </td>
+
+                    {user.role === 'ADMIN' && (
+                      <td>
+                        <div className="inline-actions">
+                          <button
+                            type="button"
+                            className={
+                              student.active
+                                ? 'text-btn danger-text'
+                                : 'text-btn'
+                            }
+                            disabled={isBusy}
+                            onClick={() => toggleStudent(student)}
+                          >
+                            {isBusy
+                              ? 'Updating…'
+                              : student.active
+                                ? 'Deactivate'
+                                : 'Reactivate'}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="text-btn danger-text"
+                            disabled={isBusy}
+                            onClick={() => deleteStudent(student)}
+                          >
+                            {isBusy ? 'Working…' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -894,49 +938,65 @@ function Students({ user }) {
 
 function Teachers() {
   const [items, setItems] = useState([]);
-  const [show, setShow] =
-    useState(false);
-
-  const [deletingId, setDeletingId] =
-    useState('');
-
-  const [error, setError] =
-    useState('');
-
-  const [loading, setLoading] =
-    useState(true);
+  const [show, setShow] = useState(false);
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     try {
       setLoading(true);
       setError('');
 
-      const data =
-        await api('/api/teachers');
-
+      const data = await api('/api/teachers');
       setItems(data.teachers || []);
     } catch (e) {
-      console.error(
-        'Failed to load teachers:',
-        e
-      );
-
+      console.error('Failed to load teachers:', e);
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteTeacher = async (teacher) => {
+  const toggleTeacher = async (teacher) => {
+    const action = teacher.active ? 'deactivate' : 'reactivate';
+
     const confirmed = window.confirm(
-      `Delete teacher \"${teacher.name}\" permanently? This will also remove the teacher's rosters and classes.`
+      `Are you sure you want to ${action} ${teacher.name}?`
     );
 
     if (!confirmed) return;
 
     try {
       setError('');
-      setDeletingId(teacher.id);
+      setBusyId(teacher.id);
+
+      await api(`/api/teachers/${teacher.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          active: !teacher.active,
+        }),
+      });
+
+      await load();
+    } catch (e) {
+      console.error('Failed to update teacher status:', e);
+      setError(e.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const deleteTeacher = async (teacher) => {
+    const confirmed = window.confirm(
+      `Delete teacher "${teacher.name}" permanently? This will also remove the teacher's rosters and classes.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setBusyId(teacher.id);
 
       await api(`/api/teachers/${teacher.id}`, {
         method: 'DELETE',
@@ -949,7 +1009,7 @@ function Teachers() {
       console.error('Failed to delete teacher:', e);
       setError(e.message);
     } finally {
-      setDeletingId('');
+      setBusyId('');
     }
   };
 
@@ -988,46 +1048,76 @@ function Teachers() {
         </div>
       ) : (
         <div className="people-grid">
-          {items.map((teacher) => (
-            <div
-              className="person-card"
-              key={teacher.id}
-            >
-              <div className="avatar">
-                {teacher.name?.[0] ||
-                  'T'}
+          {items.map((teacher) => {
+            const isBusy = busyId === teacher.id;
+
+            return (
+              <div
+                className={`person-card ${
+                  teacher.active ? '' : 'person-inactive'
+                }`}
+                key={teacher.id}
+              >
+                <div className="avatar">
+                  {teacher.name?.[0] || 'T'}
+                </div>
+
+                <div>
+                  <h4>{teacher.name}</h4>
+
+                  <p>
+                    {teacher.phone || 'No phone'}
+                  </p>
+
+                  <small>
+                    {teacher.email || 'No email'}
+                  </small>
+
+                  <small>
+                    {teacher.timezone}
+                  </small>
+
+                  <div className="person-actions">
+                    <span
+                      className={
+                        teacher.active
+                          ? 'status'
+                          : 'status inactive'
+                      }
+                    >
+                      {teacher.active ? 'Active' : 'Inactive'}
+                    </span>
+
+                    <button
+                      type="button"
+                      className={
+                        teacher.active
+                          ? 'text-btn danger-text'
+                          : 'text-btn'
+                      }
+                      disabled={isBusy}
+                      onClick={() => toggleTeacher(teacher)}
+                    >
+                      {isBusy
+                        ? 'Updating…'
+                        : teacher.active
+                          ? 'Deactivate'
+                          : 'Reactivate'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="text-btn danger-text"
+                      disabled={isBusy}
+                      onClick={() => deleteTeacher(teacher)}
+                    >
+                      {isBusy ? 'Working…' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <h4>{teacher.name}</h4>
-
-                <p>
-                  {teacher.phone ||
-                    'No phone'}
-                </p>
-
-                <small>
-                  {teacher.email ||
-                    'No email'}
-                </small>
-
-                <small>
-                  {teacher.timezone}
-                </small>
-
-                <button
-                  type="button"
-                  className="text-btn"
-                  disabled={deletingId === teacher.id}
-                  onClick={() => deleteTeacher(teacher)}
-                >
-                  {deletingId === teacher.id
-                    ? 'Deleting…'
-                    : 'Delete'}
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
