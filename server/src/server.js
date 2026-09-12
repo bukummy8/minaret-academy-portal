@@ -621,6 +621,141 @@ app.patch(
 );
 
 /* =========================================================
+   DELETE STUDENT
+========================================================= */
+
+app.delete(
+  '/api/students/:id',
+  requireAuth,
+  requireRole('ADMIN'),
+  async (req, res) => {
+    const client =
+      await pool.connect();
+
+    try {
+      await client.query(
+        'BEGIN'
+      );
+
+      /* -------------------------
+         Verify student
+      ------------------------- */
+
+      const student =
+        await client.query(
+          `SELECT
+             id,
+             name,
+             role
+           FROM users
+           WHERE id=$1
+           FOR UPDATE`,
+          [req.params.id]
+        );
+
+      if (!student.rows[0]) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(404).json({
+          error: 'Student not found',
+        });
+      }
+
+      if (
+        student.rows[0].role !==
+        'STUDENT'
+      ) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(400).json({
+          error:
+            'Only student accounts can be deleted here',
+        });
+      }
+
+      /* -------------------------
+         Remove student from
+         teacher rosters
+      ------------------------- */
+
+      await client.query(
+        `DELETE FROM teacher_students
+         WHERE student_id=$1`,
+        [req.params.id]
+      );
+
+      /* -------------------------
+         Remove student from
+         all classes
+      ------------------------- */
+
+      await client.query(
+        `DELETE FROM class_students
+         WHERE student_id=$1`,
+        [req.params.id]
+      );
+
+      /* -------------------------
+         Delete student account
+      ------------------------- */
+
+      const deleted =
+        await client.query(
+          `DELETE FROM users
+           WHERE id=$1
+             AND role='STUDENT'
+           RETURNING
+             id,
+             name`,
+          [req.params.id]
+        );
+
+      if (!deleted.rows[0]) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(404).json({
+          error:
+            'Student could not be deleted',
+        });
+      }
+
+      await client.query(
+        'COMMIT'
+      );
+
+      res.json({
+        ok: true,
+        message:
+          'Student deleted successfully',
+        student: deleted.rows[0],
+      });
+    } catch (e) {
+      await client.query(
+        'ROLLBACK'
+      );
+
+      console.error(
+        'Delete student error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Could not delete student',
+      });
+    } finally {
+      client.release();
+    }
+  }
+);
+
+/* =========================================================
    TEACHERS
 ========================================================= */
 
@@ -806,6 +941,168 @@ app.patch(
         ? 'Teacher activated successfully'
         : 'Teacher deactivated successfully',
     });
+  }
+);
+
+/* =========================================================
+   DELETE TEACHER
+========================================================= */
+
+app.delete(
+  '/api/teachers/:id',
+  requireAuth,
+  requireRole('ADMIN'),
+  async (req, res) => {
+    const client =
+      await pool.connect();
+
+    try {
+      await client.query(
+        'BEGIN'
+      );
+
+      /* -------------------------
+         Verify teacher
+      ------------------------- */
+
+      const teacher =
+        await client.query(
+          `SELECT
+             id,
+             name,
+             role
+           FROM users
+           WHERE id=$1
+           FOR UPDATE`,
+          [req.params.id]
+        );
+
+      if (!teacher.rows[0]) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(404).json({
+          error: 'Teacher not found',
+        });
+      }
+
+      if (
+        teacher.rows[0].role !==
+        'TEACHER'
+      ) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(400).json({
+          error:
+            'Only teacher accounts can be deleted here',
+        });
+      }
+
+      /* -------------------------
+         Find teacher classes
+      ------------------------- */
+
+      const classes =
+        await client.query(
+          `SELECT id
+           FROM classes
+           WHERE teacher_id=$1`,
+          [req.params.id]
+        );
+
+      const classIds =
+        classes.rows.map(
+          (row) => row.id
+        );
+
+      /* -------------------------
+         Remove class students
+      ------------------------- */
+
+      if (classIds.length > 0) {
+        await client.query(
+          `DELETE FROM class_students
+           WHERE class_id = ANY($1::uuid[])`,
+          [classIds]
+        );
+      }
+
+      /* -------------------------
+         Delete teacher classes
+      ------------------------- */
+
+      await client.query(
+        `DELETE FROM classes
+         WHERE teacher_id=$1`,
+        [req.params.id]
+      );
+
+      /* -------------------------
+         Remove teacher rosters
+      ------------------------- */
+
+      await client.query(
+        `DELETE FROM teacher_students
+         WHERE teacher_id=$1`,
+        [req.params.id]
+      );
+
+      /* -------------------------
+         Delete teacher account
+      ------------------------- */
+
+      const deleted =
+        await client.query(
+          `DELETE FROM users
+           WHERE id=$1
+             AND role='TEACHER'
+           RETURNING
+             id,
+             name`,
+          [req.params.id]
+        );
+
+      if (!deleted.rows[0]) {
+        await client.query(
+          'ROLLBACK'
+        );
+
+        return res.status(404).json({
+          error:
+            'Teacher could not be deleted',
+        });
+      }
+
+      await client.query(
+        'COMMIT'
+      );
+
+      res.json({
+        ok: true,
+        message:
+          'Teacher deleted successfully',
+        teacher: deleted.rows[0],
+      });
+    } catch (e) {
+      await client.query(
+        'ROLLBACK'
+      );
+
+      console.error(
+        'Delete teacher error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Could not delete teacher',
+      });
+    } finally {
+      client.release();
+    }
   }
 );
 
