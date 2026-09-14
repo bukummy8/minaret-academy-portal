@@ -45,5 +45,8 @@ jobs:
       - name: Build client
         run: npm run build
 
+      - name: Build Docker API image
+        run: docker build -t minaret-academy-api:ci ./server
+
       - name: CI completed
         run: echo "Minaret Academy CI checks passed successfully."
